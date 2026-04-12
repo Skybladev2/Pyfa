@@ -28,13 +28,17 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      should_build: ${{ steps.integrate.outputs.should_build }}
+      integration_branch: ${{ steps.integrate.outputs.integration_branch }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Sync upstream and merge fix branches
+      - id: integrate
+        name: Sync upstream and merge fix branches
         shell: bash
         run: |
           set -euo pipefail
@@ -53,6 +57,8 @@ jobs:
           # No upstream updates and we already have integration branch(es) — stop
           if [ "${ahead_count}" -eq 0 ] && [ "${existing_count}" -gt 0 ]; then
             echo "No new commits on upstream/${UPSTREAM_BRANCH}; integration branch(es) already exist — nothing to do."
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+            echo "integration_branch=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -89,3 +95,35 @@ jobs:
                 ;;
             esac
           done < <(git ls-remote origin "refs/heads/${INTEGRATION_PREFIX}/*")
+
+          echo "should_build=true" >> "$GITHUB_OUTPUT"
+          echo "integration_branch=${integration_branch}" >> "$GITHUB_OUTPUT"
+
+  build-windows:
+    name: Build Windows exe (PyInstaller)
+    needs: sync
+    if: needs.sync.outputs.should_build == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.sync.outputs.integration_branch }}
+          fetch-depth: 0
+
+      - name: Set up Python 3.11 (x64)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          architecture: x64
+
+      - name: Build with dist_assets/win/build_exe_only.bat
+        shell: cmd
+        run: dist_assets\win\build_exe_only.bat
+
+      - name: Upload pyfa Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: pyfa-${{ replace(needs.sync.outputs.integration_branch, '/', '-') }}-${{ github.run_id }}
+          path: dist/pyfa/
