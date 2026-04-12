@@ -1,6 +1,7 @@
-# Daily sync: merge pyfa-org/Pyfa master into this fork's master, then build an
-# integration branch that merges fix branches (see env vars below) and prunes
-# older auto-created integration branches on success.
+# Daily sync: merge pyfa-org/Pyfa master into this fork's master when needed, then
+# build an integration branch that merges fix branches (see env vars below) and prunes
+# older auto-created integration branches on success. If upstream is unchanged but no
+# integration branch exists yet, creates the first one from current master.
 name: Sync upstream and integrate fix branches
 
 on:
@@ -46,19 +47,24 @@ jobs:
           git fetch origin
           git fetch upstream "${UPSTREAM_BRANCH}"
 
-          # Nothing new on upstream compared to our published master — stop
           ahead_count="$(git rev-list --count "origin/${UPSTREAM_BRANCH}..upstream/${UPSTREAM_BRANCH}")"
-          if [ "${ahead_count}" -eq 0 ]; then
-            echo "No new commits on upstream/${UPSTREAM_BRANCH}; nothing to do."
+          existing_count="$(git ls-remote origin "refs/heads/${INTEGRATION_PREFIX}/*" | wc -l | tr -d '[:space:]')"
+
+          # No upstream updates and we already have integration branch(es) — stop
+          if [ "${ahead_count}" -eq 0 ] && [ "${existing_count}" -gt 0 ]; then
+            echo "No new commits on upstream/${UPSTREAM_BRANCH}; integration branch(es) already exist — nothing to do."
             exit 0
           fi
 
-          echo "Upstream is ${ahead_count} commit(s) ahead of origin/${UPSTREAM_BRANCH}; merging."
-
-          git checkout -B "${UPSTREAM_BRANCH}" "origin/${UPSTREAM_BRANCH}"
-          git merge "upstream/${UPSTREAM_BRANCH}" -m "Merge upstream ${UPSTREAM_BRANCH} ($(date -u +%Y-%m-%d))"
-
-          git push origin "${UPSTREAM_BRANCH}"
+          if [ "${ahead_count}" -gt 0 ]; then
+            echo "Upstream is ${ahead_count} commit(s) ahead of origin/${UPSTREAM_BRANCH}; merging."
+            git checkout -B "${UPSTREAM_BRANCH}" "origin/${UPSTREAM_BRANCH}"
+            git merge "upstream/${UPSTREAM_BRANCH}" -m "Merge upstream ${UPSTREAM_BRANCH} ($(date -u +%Y-%m-%d))"
+            git push origin "${UPSTREAM_BRANCH}"
+          else
+            echo "No new upstream commits; no ${INTEGRATION_PREFIX}/* branches yet — creating the first from origin/${UPSTREAM_BRANCH}."
+            git checkout -B "${UPSTREAM_BRANCH}" "origin/${UPSTREAM_BRANCH}"
+          fi
 
           # Unique integration branch name (safe for multiple runs per day)
           stamp="$(date -u +%Y-%m-%d-%H%M%S)"
