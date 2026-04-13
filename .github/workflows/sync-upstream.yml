@@ -22,7 +22,7 @@ env:
   # Named "focus graph" in docs; remote branch is focus-graph
   FIX_BRANCH_2: focus-graph
   INTEGRATION_PREFIX: upstream-integration
-  RELEASE_TAG: windows-integration
+  RELEASE_TAG: patched-pyfa
 
 jobs:
   sync:
