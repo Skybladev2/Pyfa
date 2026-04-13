@@ -22,6 +22,7 @@ env:
   # Named "focus graph" in docs; remote branch is focus-graph
   FIX_BRANCH_2: focus-graph
   INTEGRATION_PREFIX: upstream-integration
+  RELEASE_TAG: windows-integration
 
 jobs:
   sync:
@@ -109,6 +110,8 @@ jobs:
     if: needs.sync.outputs.should_build == 'true'
     runs-on: windows-latest
     timeout-minutes: 90
+    permissions:
+      contents: write
     steps:
       - name: Checkout integration branch
         uses: actions/checkout@v4
@@ -126,8 +129,32 @@ jobs:
         shell: cmd
         run: dist_assets\win\build_exe_only.bat
 
-      - name: Upload pyfa Windows build
-        uses: actions/upload-artifact@v4
-        with:
-          name: pyfa-${{ needs.sync.outputs.artifact_slug }}-${{ github.run_id }}
-          path: dist/pyfa/
+      - name: Publish pyfa.exe to release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INTEGRATION_BRANCH: ${{ needs.sync.outputs.integration_branch }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          release_title="Windows integration build"
+          release_notes="Latest Windows integration build from branch ${INTEGRATION_BRANCH} (run ${RUN_ID})."
+
+          if ! gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh release create "${RELEASE_TAG}" \
+              --title "${release_title}" \
+              --notes "${release_notes}"
+          else
+            gh release edit "${RELEASE_TAG}" \
+              --title "${release_title}" \
+              --notes "${release_notes}"
+          fi
+
+          while IFS= read -r asset_name; do
+            if [ -n "${asset_name}" ]; then
+              gh release delete-asset "${RELEASE_TAG}" "${asset_name}" --yes
+            fi
+          done < <(gh release view "${RELEASE_TAG}" --json assets -q '.assets[].name')
+
+          gh release upload "${RELEASE_TAG}" "dist/pyfa/pyfa.exe"
