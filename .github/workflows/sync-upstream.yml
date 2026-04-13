@@ -56,8 +56,8 @@ jobs:
           ahead_count="$(git rev-list --count "origin/${UPSTREAM_BRANCH}..upstream/${UPSTREAM_BRANCH}")"
           existing_count="$(git ls-remote origin "refs/heads/${INTEGRATION_PREFIX}/*" | wc -l | tr -d '[:space:]')"
 
-          # No upstream updates and we already have integration branch(es) — stop
-          if [ "${ahead_count}" -eq 0 ] && [ "${existing_count}" -gt 0 ]; then
+          # Scheduled run with no upstream updates and existing integration branch(es) — stop
+          if [ "${GITHUB_EVENT_NAME}" != "workflow_dispatch" ] && [ "${ahead_count}" -eq 0 ] && [ "${existing_count}" -gt 0 ]; then
             echo "No new commits on upstream/${UPSTREAM_BRANCH}; integration branch(es) already exist — nothing to do."
             echo "should_build=false" >> "$GITHUB_OUTPUT"
             echo "integration_branch=" >> "$GITHUB_OUTPUT"
@@ -70,6 +70,9 @@ jobs:
             git checkout -B "${UPSTREAM_BRANCH}" "origin/${UPSTREAM_BRANCH}"
             git merge "upstream/${UPSTREAM_BRANCH}" -m "Merge upstream ${UPSTREAM_BRANCH} ($(date -u +%Y-%m-%d))"
             git push origin "${UPSTREAM_BRANCH}"
+          elif [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            echo "Manual dispatch requested; rebuilding integration branch from origin/${UPSTREAM_BRANCH}."
+            git checkout -B "${UPSTREAM_BRANCH}" "origin/${UPSTREAM_BRANCH}"
           else
             echo "No new upstream commits; no ${INTEGRATION_PREFIX}/* branches yet — creating the first from origin/${UPSTREAM_BRANCH}."
             git checkout -B "${UPSTREAM_BRANCH}" "origin/${UPSTREAM_BRANCH}"
@@ -157,4 +160,4 @@ jobs:
             fi
           done < <(gh release view "${RELEASE_TAG}" --json assets -q '.assets[].name')
 
-          gh release upload "${RELEASE_TAG}" "dist/pyfa/pyfa.exe"
+          gh release upload "${RELEASE_TAG}" "dist/pyfa.exe"
