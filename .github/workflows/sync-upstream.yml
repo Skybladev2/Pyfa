@@ -2,7 +2,7 @@
 # build an integration branch that merges fix branches (see env vars below) and prunes
 # older auto-created integration branches on success. If upstream is unchanged but no
 # integration branch exists yet, creates the first one from current master.
-name: Sync upstream and integrate fix branches
+name: Patched Pyfa build
 
 on:
   schedule:
@@ -149,8 +149,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          release_title="Windows integration build"
-          release_notes="Latest Windows integration build from branch ${INTEGRATION_BRANCH} (run ${RUN_ID})."
+          release_title="Patched Pyfa build"
+          release_notes="Contains 2 fixes: https://github.com/pyfa-org/Pyfa/pull/2741 and https://github.com/pyfa-org/Pyfa/pull/2742. Built from branch ${INTEGRATION_BRANCH} (run ${RUN_ID})."
 
           if ! gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
             gh release create "${RELEASE_TAG}" \
