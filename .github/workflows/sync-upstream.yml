@@ -132,7 +132,15 @@ jobs:
         shell: cmd
         run: dist_assets\win\build_exe_only.bat
 
-      - name: Publish pyfa.exe to release
+      - name: Package Windows build
+        shell: powershell
+        run: |
+          if (Test-Path "dist\pyfa-release.zip") {
+            Remove-Item "dist\pyfa-release.zip" -Force
+          }
+          Compress-Archive -Path "dist\pyfa\*" -DestinationPath "dist\pyfa-release.zip" -CompressionLevel Optimal
+
+      - name: Publish Windows zip to release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -160,4 +168,4 @@ jobs:
             fi
           done < <(gh release view "${RELEASE_TAG}" --json assets -q '.assets[].name')
 
-          gh release upload "${RELEASE_TAG}" "dist/pyfa.exe"
+          gh release upload "${RELEASE_TAG}" "dist/pyfa-release.zip"
