@@ -19,8 +19,8 @@ env:
   UPSTREAM_BRANCH: master
   # Fork branches to merge into each new integration branch (after upstream sync)
   FIX_BRANCH_1: fix-projected-on-tab-switch
-  # Named "focus graph" in docs; remote branch is focus-graph
   FIX_BRANCH_2: focus-graph
+  FIX_BRANCH_3: fix/calibration-points-overflow
   INTEGRATION_PREFIX: upstream-integration
   RELEASE_TAG: patched-pyfa
 
@@ -86,6 +86,7 @@ jobs:
 
           git merge "origin/${FIX_BRANCH_1}" -m "Merge ${FIX_BRANCH_1} into ${integration_branch}"
           git merge "origin/${FIX_BRANCH_2}" -m "Merge ${FIX_BRANCH_2} into ${integration_branch}"
+          git merge "origin/${FIX_BRANCH_3}" -m "Merge ${FIX_BRANCH_3} into ${integration_branch}"
 
           git push origin "${integration_branch}"
 
@@ -150,7 +151,7 @@ jobs:
           set -euo pipefail
 
           release_title="Patched Pyfa build"
-          release_notes="Contains 2 fixes: https://github.com/pyfa-org/Pyfa/pull/2741 and https://github.com/pyfa-org/Pyfa/pull/2742. Built from branch ${INTEGRATION_BRANCH} (run ${RUN_ID})."
+          release_notes="Contains integration fixes from ${FIX_BRANCH_1}, ${FIX_BRANCH_2}, and ${FIX_BRANCH_3}. Built from branch ${INTEGRATION_BRANCH} (run ${RUN_ID})."
 
           if ! gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
             gh release create "${RELEASE_TAG}" \
