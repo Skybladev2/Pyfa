@@ -151,7 +151,7 @@ jobs:
           set -euo pipefail
 
           release_title="Patched Pyfa build"
-          release_notes="Contains integration fixes from ${FIX_BRANCH_1}, ${FIX_BRANCH_2}, and ${FIX_BRANCH_3}. Built from branch ${INTEGRATION_BRANCH} (run ${RUN_ID})."
+          release_notes="Includes fixes from PRs: https://github.com/pyfa-org/Pyfa/pull/2748, https://github.com/pyfa-org/Pyfa/pull/2742, and https://github.com/pyfa-org/Pyfa/pull/2741. Built from branch ${INTEGRATION_BRANCH} (run ${RUN_ID})."
 
           if ! gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
             gh release create "${RELEASE_TAG}" \
