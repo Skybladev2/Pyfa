@@ -54,11 +54,40 @@ jobs:
           git fetch upstream "${UPSTREAM_BRANCH}"
 
           ahead_count="$(git rev-list --count "origin/${UPSTREAM_BRANCH}..upstream/${UPSTREAM_BRANCH}")"
-          existing_count="$(git ls-remote origin "refs/heads/${INTEGRATION_PREFIX}/*" | wc -l | tr -d '[:space:]')"
 
-          # Scheduled run with no upstream updates and existing integration branch(es) — stop
-          if [ "${GITHUB_EVENT_NAME}" != "workflow_dispatch" ] && [ "${ahead_count}" -eq 0 ] && [ "${existing_count}" -gt 0 ]; then
-            echo "No new commits on upstream/${UPSTREAM_BRANCH}; integration branch(es) already exist — nothing to do."
+          # Newest already-published integration branch, if any.
+          published_tip="$(git for-each-ref --sort=-committerdate --format='%(objectname)' "refs/remotes/origin/${INTEGRATION_PREFIX}/" | head -n 1)"
+
+          # Rebuild whenever the published integration branch is missing commits that are
+          # already on master or on any of the fix branches. Upstream movement alone is not
+          # a sufficient signal, because this fork also moves on its own: gating on
+          # "upstream is ahead" left the release stale for months while master and the fix
+          # branches gained commits.
+          needs_build=0
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            echo "Manual dispatch requested."
+            needs_build=1
+          elif [ -z "${published_tip}" ]; then
+            echo "No ${INTEGRATION_PREFIX}/* branch exists yet."
+            needs_build=1
+          else
+            if ! git merge-base --is-ancestor "origin/${UPSTREAM_BRANCH}" "${published_tip}"; then
+              echo "origin/${UPSTREAM_BRANCH} is not fully contained in ${published_tip}."
+              needs_build=1
+            fi
+            for branch in "${FIX_BRANCH_1}" "${FIX_BRANCH_2}" "${OMEGA_BRANCH}"; do
+              # patch-id comparison, so commits already present in a rebased form inside
+              # the published branch do not count as missing
+              missing="$(git cherry "${published_tip}" "origin/${branch}" | grep -c '^+' || true)"
+              if [ "${missing}" -ne 0 ]; then
+                echo "origin/${branch} has ${missing} commit(s) missing from ${published_tip}."
+                needs_build=1
+              fi
+            done
+          fi
+
+          if [ "${needs_build}" -eq 0 ]; then
+            echo "Published integration ${published_tip} is up to date — nothing to do."
             echo "should_build=false" >> "$GITHUB_OUTPUT"
             echo "integration_branch=" >> "$GITHUB_OUTPUT"
             echo "artifact_slug=" >> "$GITHUB_OUTPUT"
@@ -85,13 +114,19 @@ jobs:
           git checkout -b "${integration_branch}" "${UPSTREAM_BRANCH}"
 
           for branch in "${FIX_BRANCH_1}" "${FIX_BRANCH_2}" "${OMEGA_BRANCH}"; do
-            if git merge-base --is-ancestor "origin/${branch}" "HEAD" 2>/dev/null; then
-              echo "${branch} already included; skipping."
+            if git merge-base --is-ancestor "origin/${branch}" "${integration_branch}"; then
+              echo "${branch} already included in ${integration_branch}; skipping."
               continue
             fi
             echo "Rebasing ${branch} onto ${integration_branch}."
-            git rebase --onto HEAD "origin/${UPSTREAM_BRANCH}" "origin/${branch}"
+            git checkout -B "rebased-${branch}" "origin/${branch}"
+            # Rebase onto the integration branch itself: git derives the fork point, so only
+            # the commits the integration branch is missing get replayed. Passing
+            # "origin/${UPSTREAM_BRANCH}" as the fork point instead would replay commits that
+            # upstream already contributed whenever master had just been rebased.
+            git rebase "${integration_branch}"
             git checkout -B "${integration_branch}"
+            git branch -D "rebased-${branch}"
           done
 
           git push origin "${integration_branch}"
@@ -157,7 +192,7 @@ jobs:
           set -euo pipefail
 
           release_title="Patched Pyfa build"
-          release_notes="Includes fixes from PRs: https://github.com/pyfa-org/Pyfa/pull/2748 and https://github.com/pyfa-org/Pyfa/pull/2742. Also includes omega-modules changes. Built from branch ${INTEGRATION_BRANCH} (run ${RUN_ID})."
+          release_notes="pyfa upstream master, plus this fork's pending fixes: https://github.com/pyfa-org/Pyfa/pull/2742 (fix-projected-on-tab-switch), focus-graph and omega-modules. Fixes already merged upstream are inherited from pyfa-org master. Built from branch ${INTEGRATION_BRANCH} (run ${RUN_ID})."
 
           if ! gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
             gh release create "${RELEASE_TAG}" \
