@@ -117,15 +117,14 @@ jobs:
               echo "${branch} already included in ${integration_branch}; skipping."
               continue
             fi
-            echo "Rebasing ${branch} onto ${integration_branch}."
-            git checkout -B "rebased-${branch}" "origin/${branch}"
-            # Rebase onto the integration branch itself: git derives the fork point, so only
-            # the commits the integration branch is missing get replayed. Passing
-            # "origin/${UPSTREAM_BRANCH}" as the fork point instead would replay commits that
-            # upstream already contributed whenever master had just been rebased.
-            git rebase "${integration_branch}"
-            git checkout -B "${integration_branch}"
-            git branch -D "rebased-${branch}"
+            echo "Merging ${branch} into ${integration_branch}."
+            # Merge rather than rebase. The fix branches share a commit
+            # ("Recalculate all graph fits...") that one of them then partly reverts.
+            # A rebase skips the shared commit by patch-id and afterwards conflicts on the
+            # revert, which drops the other branch's changes and fails the build. Merging
+            # composes both branches against their common merge base, so every feature is
+            # kept intact.
+            git merge --no-edit "origin/${branch}"
           done
 
           git push origin "${integration_branch}"
