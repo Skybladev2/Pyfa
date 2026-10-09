@@ -57,11 +57,12 @@ jobs:
           # Newest already-published integration branch, if any.
           published_tip="$(git for-each-ref --sort=-committerdate --format='%(objectname)' "refs/remotes/origin/${INTEGRATION_PREFIX}/" | head -n 1)"
 
-          # Rebuild whenever the published integration branch is missing commits that are
-          # already on master or on any of the fix branches. Upstream movement alone is not
-          # a sufficient signal, because this fork also moves on its own: gating on
-          # "upstream is ahead" left the release stale for months while master and the fix
-          # branches gained commits.
+          # Rebuild whenever the newest published integration branch is missing anything the
+          # release should contain: upstream/master (new upstream releases), this fork's
+          # master, or commits from any fix branch. Checking upstream alone is not enough
+          # because this fork also moves on its own; checking only origin/master is not
+          # enough either, because master is rebased onto upstream only during a build, so
+          # an upstream-only release would never trigger one.
           needs_build=0
           if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
             echo "Manual dispatch requested."
@@ -70,10 +71,12 @@ jobs:
             echo "No ${INTEGRATION_PREFIX}/* branch exists yet."
             needs_build=1
           else
-            if ! git merge-base --is-ancestor "origin/${UPSTREAM_BRANCH}" "${published_tip}"; then
-              echo "origin/${UPSTREAM_BRANCH} is not fully contained in ${published_tip}."
-              needs_build=1
-            fi
+            for ref in "upstream/${UPSTREAM_BRANCH}" "origin/${UPSTREAM_BRANCH}"; do
+              if ! git merge-base --is-ancestor "${ref}" "${published_tip}"; then
+                echo "${ref} is not fully contained in ${published_tip}."
+                needs_build=1
+              fi
+            done
             for branch in "${FIX_BRANCH_1}" "${FIX_BRANCH_2}"; do
               # patch-id comparison, so commits already present in a rebased form inside
               # the published branch do not count as missing
