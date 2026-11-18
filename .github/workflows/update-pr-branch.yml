@@ -1,0 +1,57 @@
+# Keeps the PR branch current with its base branch. Runs the LangGraph workflow in
+# automation/pr_sync, which merges pyfa-org/master into the PR head only when the
+# head does not already contain the base.
+name: Keep PR branch up to date
+
+on:
+  schedule:
+    # Daily at 05:00 UTC, before the patched-build sync at 05:15 UTC.
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: PR branch to update
+        required: false
+        default: focus-graph
+      dry_run:
+        description: Report what would change without merging or pushing
+        type: boolean
+        default: false
+
+concurrency:
+  group: pr-branch-sync-${{ github.event.inputs.branch || 'focus-graph' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    name: Update ${{ github.event.inputs.branch || 'focus-graph' }} from pyfa-org/master
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: automation/pr_sync/requirements.txt
+
+      - name: Install LangGraph
+        run: pip install -r automation/pr_sync/requirements.txt
+
+      - name: Run the PR sync graph
+        env:
+          BRANCH: ${{ github.event.inputs.branch || 'focus-graph' }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          PR_SYNC_BASE_URL: https://github.com/pyfa-org/Pyfa.git
+        run: |
+          args=(--repo-dir . --branch "$BRANCH" --base-url "$PR_SYNC_BASE_URL")
+          if [ "$DRY_RUN" = "true" ]; then
+            args+=(--dry-run)
+          fi
+          python -m automation.pr_sync "${args[@]}"
