@@ -1,0 +1,7 @@
+{
+  "dependencies": ["."],
+  "graphs": {
+    "pr_sync": "./graph.py:graph"
+  },
+  "env": ".env"
+}

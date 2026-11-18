@@ -1,0 +1,6 @@
+[project]
+name = "pyfa-pr-sync"
+version = "0.1.0"
+description = "LangGraph workflow that keeps a pull request branch current with its base branch"
+requires-python = ">=3.10"
+dependencies = ["langgraph==1.0.4"]
