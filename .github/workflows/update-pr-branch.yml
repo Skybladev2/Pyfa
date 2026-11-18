@@ -30,12 +30,12 @@ jobs:
     name: Update ${{ github.event.inputs.branch || 'focus-graph' }} from pyfa-org/master
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: master
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
