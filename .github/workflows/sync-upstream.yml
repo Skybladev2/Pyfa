@@ -20,6 +20,7 @@ env:
   # Fork branches to rebase into each new integration branch (after upstream sync)
   FIX_BRANCH_1: fix-projected-on-tab-switch
   FIX_BRANCH_2: focus-graph
+  FIX_BRANCH_3: fix/damage-stats-target-projections
   INTEGRATION_PREFIX: upstream-integration
   RELEASE_TAG: patched-pyfa
 
@@ -77,7 +78,7 @@ jobs:
                 needs_build=1
               fi
             done
-            for branch in "${FIX_BRANCH_1}" "${FIX_BRANCH_2}"; do
+            for branch in "${FIX_BRANCH_1}" "${FIX_BRANCH_2}" "${FIX_BRANCH_3}"; do
               # patch-id comparison, so commits already present in a rebased form inside
               # the published branch do not count as missing
               missing="$(git cherry "${published_tip}" "origin/${branch}" | grep -c '^+' || true)"
@@ -115,7 +116,7 @@ jobs:
 
           git checkout -b "${integration_branch}" "${UPSTREAM_BRANCH}"
 
-          for branch in "${FIX_BRANCH_1}" "${FIX_BRANCH_2}"; do
+          for branch in "${FIX_BRANCH_1}" "${FIX_BRANCH_2}" "${FIX_BRANCH_3}"; do
             if git merge-base --is-ancestor "origin/${branch}" "${integration_branch}"; then
               echo "${branch} already included in ${integration_branch}; skipping."
               continue
@@ -193,7 +194,7 @@ jobs:
           set -euo pipefail
 
           release_title="Patched Pyfa build"
-          release_notes="pyfa upstream master, plus this fork's pending fixes: https://github.com/pyfa-org/Pyfa/pull/2742 (fix-projected-on-tab-switch) and focus-graph. The Omega icons feature (https://github.com/pyfa-org/Pyfa/pull/2776) is now merged upstream and is inherited from pyfa-org master. Built from branch ${INTEGRATION_BRANCH} (run ${RUN_ID})."
+          release_notes="pyfa upstream master, plus this fork's pending fixes: https://github.com/pyfa-org/Pyfa/pull/2742 (fix-projected-on-tab-switch), focus-graph, and fix/damage-stats-target-projections (damage stats apply target weapon disruptors to the attacker). The Omega icons feature (https://github.com/pyfa-org/Pyfa/pull/2776) is now merged upstream and is inherited from pyfa-org master. Built from branch ${INTEGRATION_BRANCH} (run ${RUN_ID})."
 
           if ! gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
             gh release create "${RELEASE_TAG}" \
